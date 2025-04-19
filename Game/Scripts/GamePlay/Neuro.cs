@@ -690,7 +690,26 @@ public class Neuro : MonoBehaviour
         // Method to set the neural network from the SimulationManager
         public void SetNeuralNetwork(NeuralNetwork network)
         {
+            // Сохраняем старые значения параметров, если они существуют
+            float[] original_params = null;
+            if (brain != null && brain.neurons != null && brain.neurons.Length > 0)
+            {
+                // Копируем входные параметры (первый слой нейронов)
+                original_params = new float[brain.neurons[0].Length];
+                Array.Copy(brain.neurons[0], original_params, original_params.Length);
+                Debug.Log($"🧠 Агент {instance_id}: Сохранены параметры нейросети перед заменой ({original_params.Length} значений)");
+            }
+            
+            // Устанавливаем новую сеть
             brain = network;
+            
+            // Восстанавливаем параметры, если они были сохранены
+            if (original_params != null && brain != null && brain.neurons != null && 
+                brain.neurons.Length > 0 && original_params.Length == brain.neurons[0].Length)
+            {
+                Array.Copy(original_params, brain.neurons[0], original_params.Length);
+                Debug.Log($"🧠 Агент {instance_id}: Восстановлены параметры после замены нейросети");
+            }
         }
 
         public void SetStartTime(float start_time)

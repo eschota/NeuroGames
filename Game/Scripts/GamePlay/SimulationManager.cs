@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
 using System;
-using UnityEditor;
 using System.Linq;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace Game.Scripts.GamePlay
 {
@@ -615,6 +617,62 @@ namespace Game.Scripts.GamePlay
                     return;
                 }
 
+                // ЖЁСТКО ФОРСИМ ОБНУЛЕНИЕ REWARD ПАРАМЕТРОВ СРАЗУ ПОСЛЕ СОЗДАНИЯ
+                Neuro neuro = agent.GetComponent<Neuro>();
+                if (neuro != null)
+                {
+                    LogGameplayEvent($"🔥 ПРИНУДИТЕЛЬНО УСТАНАВЛИВАЕМ REWARD-ПАРАМЕТРЫ агента {agent_id} из GUI!");
+                    
+                    // Устанавливаем параметры вознаграждения из GUI слайдеров
+                    try 
+                    {
+                        // Получаем актуальные значения из GUI слайдеров
+                        var gameUI = FindObjectOfType<Game.Scripts.GamePlay.Game_UI>();
+                        
+                        if (gameUI != null)
+                        {
+                            // Вызываем инициализацию из UI
+                            LogGameplayEvent($"📊 Применяем параметры из GUI к агенту {agent_id}");
+                            gameUI.InitializeAgentParams(neuro);
+                        }
+                        else
+                        {
+                            LogGameplayEvent($"⚠️ НЕ НАЙДЕН Game_UI! Устанавливаем параметры из UI напрямую.");
+                            
+                            // Получаем значения из UI слайдеров
+                            // Вместо обнуления используем реальные значения
+                            float activityValue = GetTrainingParamValue("Activity_reward");
+                            float targetValue = GetTrainingParamValue("Target_reward");
+                            float collisionValue = GetTrainingParamValue("Collision_penalty");
+                            float trackingValue = GetTrainingParamValue("Target_tracking_reward");
+                            float speedValue = GetTrainingParamValue("Speed_change_reward");
+                            float rotationValue = GetTrainingParamValue("Rotation_change_reward");
+                            float timeValue = GetTrainingParamValue("Time_bonus_multiplier");
+                            
+                            // Устанавливаем актуальные значения
+                            SetFieldValue(neuro, "activity_reward", activityValue);
+                            SetFieldValue(neuro, "target_reward", targetValue);
+                            SetFieldValue(neuro, "collision_penalty", collisionValue);
+                            SetFieldValue(neuro, "target_tracking_reward", trackingValue);
+                            SetFieldValue(neuro, "speed_change_reward", speedValue);
+                            SetFieldValue(neuro, "rotation_change_reward", rotationValue);
+                            SetFieldValue(neuro, "time_bonus_multiplier", timeValue);
+                            
+                            LogGameplayEvent($"✅ Установлены параметры из GUI: act={activityValue}, " +
+                                           $"target={targetValue}, collision={collisionValue}, " +
+                                           $"tracking={trackingValue}, speed={speedValue}, " +
+                                           $"rotation={rotationValue}, time={timeValue}");
+                            
+                            // Обнуляем фитнес
+                            SetFieldValue(neuro, "fitness", 0f);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        LogGameplayEvent($"❌ ОШИБКА при обнулении параметров: {e.Message}");
+                    }
+                }
+
                 // Проверяем и форсируем позицию
                 if (agent.transform.position != Vector3.zero)
                 {
@@ -627,7 +685,6 @@ namespace Game.Scripts.GamePlay
                 
                 // Получаем компоненты
                 Rigidbody rb = agent.GetComponentInChildren<Rigidbody>();
-                Neuro neuro = agent.GetComponent<Neuro>();
                 
                 // Ищем все рендереры в агенте и его детях
                 Renderer[] renderers = agent.GetComponentsInChildren<Renderer>();
@@ -722,6 +779,18 @@ namespace Game.Scripts.GamePlay
                     
                     // Устанавливаем время начала
                     neuro.SetStartTime(generation_start_time);
+                    
+                    // ПОВТОРНО ПРИМЕНЯЕМ ПАРАМЕТРЫ из GUI после всех операций с нейросетью
+                    try 
+                    {
+                        var gameUI = FindObjectOfType<Game.Scripts.GamePlay.Game_UI>();
+                        if (gameUI != null)
+                        {
+                            LogGameplayEvent($"🔄 ПОВТОРНО применяем параметры из GUI слайдеров к агенту {agent_id}");
+                            gameUI.InitializeAgentParams(neuro);
+                        }
+                    }
+                    catch (Exception) { /* игнорируем ошибки */ }
                 }
                 
                 // Финальная проверка позиции
@@ -737,6 +806,30 @@ namespace Game.Scripts.GamePlay
             catch (Exception e)
             {
                 LogGameplayEvent($"❌ Ошибка при спавне агента {agent_id}: {e.Message}\n{e.StackTrace}");
+            }
+        }
+        
+        // Вспомогательный метод для установки значения поля
+        private void SetFieldValue(Neuro neuro, string fieldName, float value)
+        {
+            try
+            {
+                var field = neuro.GetType().GetField(fieldName, System.Reflection.BindingFlags.Public | 
+                                                     System.Reflection.BindingFlags.NonPublic | 
+                                                     System.Reflection.BindingFlags.Instance);
+                if (field != null)
+                {
+                    field.SetValue(neuro, value);
+                    LogGameplayEvent($"✅ Установлено {fieldName}={value} для агента {neuro.instance_id}");
+                }
+                else
+                {
+                    LogGameplayEvent($"⚠️ Не найдено поле {fieldName} в агенте {neuro.instance_id}");
+                }
+            }
+            catch (Exception e)
+            {
+                LogGameplayEvent($"❌ Ошибка при установке {fieldName}: {e.Message}");
             }
         }
         
@@ -1249,18 +1342,45 @@ namespace Game.Scripts.GamePlay
         {
             if (agent_prefab == null)
             {
-                Debug.LogWarning("🔄 Префаб агента не задан или был уничтожен, пробуем загрузить из Resources...");
+                Debug.LogWarning("🔄 Префаб агента не задан или был уничтожен, попробуем найти его в сцене...");
                 
-                // Пробуем загрузить из Resources
+                // Ищем агента в сцене по тегу или имени
+                GameObject[] agentsInScene = GameObject.FindGameObjectsWithTag("Agent");
+                if (agentsInScene.Length > 0)
+                {
+                    agent_prefab = agentsInScene[0];
+                    Debug.Log($"✅ Нашли префаб агента в сцене: {agent_prefab.name}!");
+                    return;
+                }
+                
+                // Второй вариант - поискать по имени
+                GameObject agentByName = GameObject.Find("Agent");
+                if (agentByName != null)
+                {
+                    agent_prefab = agentByName;
+                    Debug.Log($"✅ Нашли префаб агента в сцене по имени: {agent_prefab.name}!");
+                    return;
+                }
+                
+                // В крайнем случае, ищем любой объект с компонентом Neuro
+                Neuro[] neuros = FindObjectsOfType<Neuro>();
+                if (neuros.Length > 0)
+                {
+                    agent_prefab = neuros[0].gameObject;
+                    Debug.Log($"✅ Нашли агента с компонентом Neuro: {agent_prefab.name}!");
+                    return;
+                }
+                
+                // Если всё еще не нашли, пробуем загрузить как ресурс (на всякий случай)
                 agent_prefab = Resources.Load<GameObject>(agent_prefab_path);
                 
                 if (agent_prefab == null)
                 {
-                    Debug.LogError($"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить префаб агента по пути {agent_prefab_path}!");
+                    Debug.LogError($"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось найти агента ни в сцене, ни в ресурсах по пути {agent_prefab_path}!");
                     return;
                 }
                 
-                Debug.Log("✅ Префаб агента успешно перезагружен!");
+                Debug.Log("✅ Префаб агента успешно загружен из Resources!");
             }
         }
 
@@ -1582,6 +1702,7 @@ namespace Game.Scripts.GamePlay
                                   speed_button_height / ui_scale),
                          "СБРОС", button_style))
             {
+#if UNITY_EDITOR
                 if (EditorUtility.DisplayDialog("Сброс обучения",
                     "Вы уверены, что хотите сбросить всё обучение?\n" +
                     "Это действие удалит все сохранённые нейросети и начнёт обучение заново.",
@@ -1589,6 +1710,10 @@ namespace Game.Scripts.GamePlay
                 {
                     ResetTraining();
                 }
+#else
+                // В билде сразу вызываем сброс без диалога
+                ResetTraining();
+#endif
             }
 
             GUI.backgroundColor = Color.white;
@@ -1673,9 +1798,11 @@ namespace Game.Scripts.GamePlay
             catch (Exception e)
             {
                 Debug.LogError($"❌ Ошибка при сбросе обучения: {e.Message}\n{e.StackTrace}");
+#if UNITY_EDITOR
                 EditorUtility.DisplayDialog("Ошибка",
                     $"Не удалось полностью сбросить обучение:\n{e.Message}",
                     "OK");
+#endif
             }
         }
 
@@ -1750,16 +1877,6 @@ namespace Game.Scripts.GamePlay
                     }
                     break;
                     
-                case "Time_bonus_multiplier":
-                    foreach (var agent in active_agents)
-                    {
-                        if (agent != null)
-                        {
-                            var neuro = agent.GetComponent<Neuro>();
-                            if (neuro != null) neuro.time_bonus_multiplier = value;
-                        }
-                    }
-                    break;
             }
         }
 
@@ -1864,6 +1981,28 @@ namespace Game.Scripts.GamePlay
             {
                 Debug.LogError($"❌ Ошибка конфигурации нейросети: {e.Message}\n{e.StackTrace}");
                 neural_layers = null; // Сбрасываем в случае ошибки
+            }
+        }
+
+        // Метод для получения текущего значения из словаря training_params
+        private float GetTrainingParamValue(string paramName)
+        {
+            if (training_params.ContainsKey(paramName))
+            {
+                return training_params[paramName];
+            }
+            
+            // Значения по умолчанию для каждого параметра
+            switch (paramName)
+            {
+                case "Activity_reward": return 1.0f;
+                case "Target_reward": return 100.0f;
+                case "Collision_penalty": return 50.0f; 
+                case "Target_tracking_reward": return 0.1f;
+                case "Speed_change_reward": return 0.05f;
+                case "Rotation_change_reward": return 0.05f;
+                case "Time_bonus_multiplier": return 0.5f;
+                default: return 0f;
             }
         }
     }
