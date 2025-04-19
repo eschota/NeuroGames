@@ -114,6 +114,9 @@ namespace Game.Scripts.GamePlay
                 }
             }
 
+            // Гарантированно обнуляем все параметры Neuro перед старом
+            ForceNullifyAllNeuralParameters();
+
             // Инициализируем UI для параметров обучения
             InitTrainingUI();
 
@@ -330,9 +333,9 @@ namespace Game.Scripts.GamePlay
 
             // Вычисляем размеры для кнопок скорости и управления
             float total_width = speed_panel_rect.width - (2 * speed_button_spacing);
-            float speed_section_width = total_width * 0.6f; // 60% под кнопки скорости
-            float control_section_width = total_width * 0.4f;  // 40% под кнопки управления
-            float control_button_width = (control_section_width - speed_button_spacing) / 2; // Делим на 2 кнопки
+            float speed_section_width = total_width * 0.5f; // 50% под кнопки скорости
+            float control_section_width = total_width * 0.5f;  // 50% под кнопки управления 
+            float control_button_width = (control_section_width - (2 * speed_button_spacing)) / 3; // Делим на 3 кнопки
 
             float button_width = (speed_section_width - ((available_speeds.Length + 1) * speed_button_spacing)) / available_speeds.Length;
             float button_x = speed_panel_rect.x + speed_button_spacing;
@@ -397,6 +400,17 @@ namespace Game.Scripts.GamePlay
                     // Вместо вызова simulation_manager.PauseTraining() просто логируем паузу
                     Debug.Log("⏸️ Обучение на паузе");
                 }
+            }
+
+            // Кнопка "НУЛИ" для сброса всех параметров
+            control_x += control_button_width + speed_button_spacing;
+            GUI.backgroundColor = new Color(0.7f, 0.3f, 0.9f); // Фиолетовый для сброса параметров
+            if (GUI.Button(new Rect(control_x, button_y,
+                                  control_button_width,
+                                  speed_button_height / ui_scale),
+                         "НУЛИ", button_style))
+            {
+                ResetAllParametersToZero();
             }
 
             // Кнопка СБРОС
@@ -496,33 +510,71 @@ namespace Game.Scripts.GamePlay
 
         void UpdateTrainingParameter(string param_name, float value)
         {
-            // Вместо прямого вызова метода simulation_manager.UpdateTrainingParameter
-            // Создаем свою локальную реализацию, которая будет обрабатывать параметры
             try
             {
                 // Логируем изменение параметра
                 Debug.Log($"📊 Изменен параметр {param_name}: {value}");
                 
-                // Здесь можно добавить свою логику для обновления параметров
-                // напрямую в компонентах Neuro, если это возможно
+                // 1. Ищем всех агентов ВСЕМИ возможными способами
                 var agents = GameObject.FindGameObjectsWithTag("Agent");
+                if (agents.Length == 0)
+                {
+                    // Если агентов не нашли по тегу, ищем по компоненту Neuro
+                    agents = FindObjectsOfType<Neuro>().Select(n => n.gameObject).ToArray();
+                }
+                
+                // 2. Применяем значения к найденным агентам
                 foreach (var agent in agents)
                 {
                     var neuro = agent.GetComponent<Neuro>();
                     if (neuro != null)
                     {
-                        // Попытка обновить свойство через рефлексию
-                        var property = neuro.GetType().GetField(param_name.ToLower());
-                        if (property != null)
+                        // Сначала пробуем напрямую установить поле по имени
+                        // Приводим имя к формату поля (camelCase)
+                        string fieldName = param_name.ToLower();
+                        var field = neuro.GetType().GetField(fieldName);
+                        
+                        if (field != null)
                         {
-                            property.SetValue(neuro, value);
+                            field.SetValue(neuro, value);
+                            Debug.Log($"✅ Установлено поле {fieldName}={value} для агента {agent.name}");
+                        }
+                        else
+                        {
+                            // Если не нашли поле по имени напрямую, пробуем все поля
+                            var allFields = neuro.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
+                            foreach (var f in allFields)
+                            {
+                                if (f.Name.ToLower().Contains(param_name.ToLower()) || 
+                                    param_name.ToLower().Contains(f.Name.ToLower()))
+                                {
+                                    f.SetValue(neuro, value);
+                                    Debug.Log($"✅ Установлено похожее поле {f.Name}={value} для агента {agent.name}");
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
+                
+                // 3. Если simulation_manager существует, пробуем установить параметры и через него
+                if (simulation_manager != null)
+                {
+                    var targetField = simulation_manager.GetType().GetField(param_name.ToLower());
+                    if (targetField != null)
+                    {
+                        targetField.SetValue(simulation_manager, value);
+                        Debug.Log($"✅ Установлен параметр {param_name}={value} в SimulationManager");
+                    }
+                }
+                
+                // 4. Записываем значение в словарь параметров (чтобы значения UI и агентов всегда совпадали)
+                training_params[param_name] = value;
+                training_inputs[param_name] = value.ToString("F1");
             }
             catch (Exception e)
             {
-                Debug.LogError($"Ошибка при обновлении параметра: {e.Message}");
+                Debug.LogError($"🔥 Ошибка при обновлении параметра {param_name}: {e.Message}");
             }
         }
 
@@ -780,25 +832,115 @@ namespace Game.Scripts.GamePlay
             training_params.Clear();
             training_inputs.Clear();
             
-            // Базовые параметры, используем тут константы
-            training_params["Activity_reward"] = 1.0f;
-            training_params["Target_reward"] = 5.0f;
-            training_params["Collision_penalty"] = 1.0f;
-            training_params["Target_tracking_reward"] = 0.5f;
-            training_params["Speed_change_reward"] = 0.2f;
-            training_params["Rotation_change_reward"] = 0.2f;
-            training_params["Time_bonus_multiplier"] = 1.0f;
+            // Базовые параметры, инициализируем НУЛЯМИ чтобы фитнес был нулевой
+            training_params["Activity_reward"] = 0.0f;
+            training_params["Target_reward"] = 0.0f;
+            training_params["Collision_penalty"] = 0.0f;
+            training_params["Target_tracking_reward"] = 0.0f;
+            training_params["Speed_change_reward"] = 0.0f;
+            training_params["Rotation_change_reward"] = 0.0f;
+            training_params["Time_bonus_multiplier"] = 0.0f;
             
             // Инициализируем текстовые значения для полей
             foreach (var param in training_params.Keys.ToList())
             {
                 training_inputs[param] = training_params[param].ToString("F1");
+                
+                // ВАЖНО: Применяем нулевые значения к агентам сразу после инициализации!
+                UpdateTrainingParameter(param, training_params[param]);
             }
             
             // Обновляем размеры и позицию UI
             UpdateUIRect();
             
-            Debug.Log("🔧 Инициализирован UI для параметров обучения");
+            Debug.Log("🔧 Инициализирован UI для параметров обучения с нулевыми значениями");
+        }
+
+        // Метод для принудительного сброса всех параметров в ноль
+        private void ResetAllParametersToZero()
+        {
+            // Останавливаем симуляцию
+            training_started = false;
+            Time.timeScale = 0f;
+            
+            // Перебираем все параметры и устанавливаем их в ноль
+            foreach (var param in training_params.Keys.ToList())
+            {
+                UpdateTrainingParameter(param, 0.0f);
+            }
+            
+            Debug.Log("🧹 Все параметры обучения сброшены в ноль!");
+            ShowError("Все параметры обучения сброшены в ноль!", 3f);
+        }
+
+        // Метод для принудительной установки всех параметров Neuro в ноль (минуя UI и словари)
+        private void ForceNullifyAllNeuralParameters()
+        {
+            Debug.Log("🔄 Принудительное обнуление всех параметров обучения...");
+            
+            // 1. Ищем всех возможных агентов
+            var agents = GameObject.FindGameObjectsWithTag("Agent");
+            if (agents.Length == 0)
+            {
+                agents = FindObjectsOfType<Neuro>().Select(n => n.gameObject).ToArray();
+            }
+            
+            if (agents.Length == 0)
+            {
+                Debug.LogWarning("⚠️ Не найдено ни одного агента для обнуления параметров!");
+                return;
+            }
+            
+            // 2. Находим первого агента чтобы получить список всех полей Neuro
+            var firstNeuro = agents[0].GetComponent<Neuro>();
+            if (firstNeuro == null)
+            {
+                Debug.LogWarning("⚠️ Компонент Neuro не найден у первого агента!");
+                return;
+            }
+            
+            // 3. Получаем список всех полей, которые похожи на параметры наград/штрафов
+            var rewardFields = firstNeuro.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic)
+                .Where(f => f.FieldType == typeof(float) && 
+                       (f.Name.ToLower().Contains("reward") || 
+                        f.Name.ToLower().Contains("penalty") || 
+                        f.Name.ToLower().Contains("bonus") ||
+                        f.Name.ToLower().Contains("multiplier")))
+                .ToList();
+            
+            // 4. Устанавливаем все эти поля в ноль для всех агентов
+            foreach (var agent in agents)
+            {
+                var neuro = agent.GetComponent<Neuro>();
+                if (neuro != null)
+                {
+                    foreach (var field in rewardFields)
+                    {
+                        field.SetValue(neuro, 0.0f);
+                        Debug.Log($"🧹 Обнулено поле {field.Name} для агента {agent.name}");
+                    }
+                }
+            }
+            
+            // 5. Если есть SimulationManager, обнуляем параметры и там
+            if (simulation_manager != null)
+            {
+                var managerFields = simulation_manager.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Where(f => f.FieldType == typeof(float) && 
+                           (f.Name.ToLower().Contains("reward") || 
+                            f.Name.ToLower().Contains("penalty") || 
+                            f.Name.ToLower().Contains("bonus") ||
+                            f.Name.ToLower().Contains("multiplier")))
+                    .ToList();
+                
+                foreach (var field in managerFields)
+                {
+                    field.SetValue(simulation_manager, 0.0f);
+                    Debug.Log($"🧹 Обнулено поле {field.Name} в SimulationManager");
+                }
+            }
+            
+            Debug.Log("✅ Принудительное обнуление всех параметров обучения завершено!");
         }
     }
 }
