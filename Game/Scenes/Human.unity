@@ -427,7 +427,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 14.5
+  field of view: 20
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -454,7 +454,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.23955257, y: -0, z: -0, w: 0.9708834}
-  m_LocalPosition: {x: -6.31, y: 19.74, z: -37.07}
+  m_LocalPosition: {x: -4.27, y: 19.74, z: -37.07}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2081,7 +2081,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d14ed8cb989624a4a8a1a1bac670b794, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  generation_time: 30
+  generation_time: 10
   population_size: 50
   mutation_rate: 0.1
   mutation_strength: 0.5
@@ -2102,7 +2102,7 @@ MonoBehaviour:
   agents_per_row: 8
   highlight_top_agents: 1
   agent_material_property: _Color
-  max_agent_force: 500000
+  max_agent_force: 1e+14
   time_speed_presets:
   - 1
   - 2
@@ -2110,14 +2110,16 @@ MonoBehaviour:
   - 4
   - 5
   time_scale: 1
-  default_motor_force: 0
+  default_motor_force: 1e+11
   draw_gizmos: 1
   neural_layers: 66000000660000003c0000000f000000
   best_model_filename: best_model.json
   models_directory: Models
   show_detailed_logs: 1
   stats_log_prefix: "\U0001F9E0\U0001F463"
-  minimum_generation_time: 7
+  save_logs_to_file: 1
+  best_agent_log_filename: best_agent_log.txt
+  minimum_generation_time: 3
   enable_early_termination: 1
   max_fallen_percentage: 0.95
 --- !u!1 &1846137161

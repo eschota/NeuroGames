@@ -33,36 +33,71 @@ namespace Game.Scripts.GamePlay
         [Tooltip("Применять разное усиление сигнала для разных групп суставов")]
         [SerializeField] private bool use_differential_motor_control = true;
         [Tooltip("Задержка между обновлениями моторов (сек)")]
-        [SerializeField] private float motor_update_interval = 0.01f; // Было 0.1f или больше
+        [SerializeField] private float motor_update_interval = 0.005f; // Уменьшаем задержку для более частого обновления
+        
+        [Header("Motion Smoothing")]
+        [Tooltip("Максимальное изменение скорости мотора за один кадр")]
+        [SerializeField] private float max_velocity_delta = 50.0f;
+        [Tooltip("Коэффициент плавности движений (0.1 - очень плавно, 1.0 - без сглаживания)")]
+        [SerializeField] private float velocity_smoothing = 0.3f;
+        
+        [Header("Joint Feedback")]
+        [Tooltip("Использовать прямую обратную связь от углов суставов для коррекции движения")]
+        [SerializeField] private bool use_joint_feedback = true;
+        [Tooltip("Сила обратной связи от угла сустава (0-1)")]
+        [SerializeField] private float joint_angle_feedback = 0.5f;
         
         [Header("Body Parts")]
         [SerializeField] private Transform head;
         [SerializeField] private Transform r_bot; // Right foot
         [SerializeField] private Transform l_bot; // Left foot
         
-        [Header("Rewards")]
-        [SerializeField] private float head_height_reward = 1f;
-        [SerializeField] private float required_head_height = 0.5f;
-        [SerializeField] private float target_reward = 100f;
-        [SerializeField] private float movement_reward = 0.1f;
-        [SerializeField] private float fall_penalty = 50f;
+        // НОВАЯ ОБЪЕДИНЕННАЯ СИСТЕМА НАГРАД
+        [Header("NEW_REWARD_System")]
+        [Tooltip("Награда за поддержание высоты головы")]
+        [SerializeField] private float NEW_REWARD_head_height_multiplier = 1.0f;
+        [Tooltip("Минимальная высота головы для получения базовой награды")]
+        [SerializeField] private float NEW_REWARD_min_head_height = 0.5f;
+        [Tooltip("Награда за достижение цели")]
+        [SerializeField] private float NEW_REWARD_target_reached = 100.0f;
+        [Tooltip("Базовая награда за движение вперед")]
+        [SerializeField] private float NEW_REWARD_movement_multiplier = 1.0f;
+        [Tooltip("Штраф за падение")]
+        [SerializeField] private float NEW_REWARD_fall_penalty = 10.0f;
+        [Tooltip("Максимальный штраф за падение (когда агент лежит на земле)")]
+        [SerializeField] private float NEW_REWARD_max_fall_penalty = 2.0f;
+        [Tooltip("Награда за выживание каждую секунду")]
+        [SerializeField] private float NEW_REWARD_survival_per_second = 0.0001f;
         
-        // Новые параметры для усиленного обучения движению
-        [Header("Enhanced Movement Rewards")]
+        [Header("NEW_REWARD_Movement")]
         [Tooltip("Множитель награды за движение в сторону цели")]
-        [SerializeField] private float target_direction_multiplier = 5.0f;
+        [SerializeField] private float NEW_REWARD_target_direction_multiplier = 5.0f;
         [Tooltip("Множитель награды за стабильное положение стоя")]
-        [SerializeField] private float standing_bonus_multiplier = 2.0f;
+        [SerializeField] private float NEW_REWARD_standing_bonus_multiplier = 2.0f;
         [Tooltip("Минимальное время стояния для получения бонуса (сек)")]
-        [SerializeField] private float min_standing_time = 1.0f;
+        [SerializeField] private float NEW_REWARD_min_standing_time = 1.0f;
         [Tooltip("Бонус за каждый метр смещения от начальной позиции")]
-        [SerializeField] private float distance_from_start_reward = 2.0f;
+        [SerializeField] private float NEW_REWARD_distance_from_start = 2.0f;
         [Tooltip("Штраф за отсутствие движения")]
-        [SerializeField] private float no_movement_penalty = 0.5f;
+        [SerializeField] private float NEW_REWARD_no_movement_penalty = 0.5f;
         [Tooltip("Награда за общую активность всех частей тела")]
-        [SerializeField] private float global_activity_reward = 0.2f;
+        [SerializeField] private float NEW_REWARD_global_activity = 0.2f;
         [Tooltip("Минимальная скорость для учета активности")]
-        [SerializeField] private float min_activity_threshold = 0.1f;
+        [SerializeField] private float NEW_REWARD_min_activity_threshold = 0.1f;
+        
+        [Header("NEW_REWARD_Learning")]
+        [Tooltip("Бонус за первые шаги (для ранних поколений)")]
+        [SerializeField] private float NEW_REWARD_early_steps_bonus = 0.2f;
+        [Tooltip("Число поколений, в течение которых действует бонус за первые шаги")]
+        [SerializeField] private int NEW_REWARD_early_bonus_generations = 10;
+        [Tooltip("Минимальное расстояние для получения бонуса за первые шаги")]
+        [SerializeField] private float NEW_REWARD_min_distance_for_early_bonus = 0.5f;
+        
+        [Header("NEW_REWARD_Balance")]
+        [Tooltip("Награда за поддержание равновесия")]
+        [SerializeField] private float NEW_REWARD_balance = 0.3f;
+        [Tooltip("Штраф за отклонение от вертикали")]
+        [SerializeField] private float NEW_REWARD_tilt_penalty = 0.2f;
         
         // Список всех суставов
         [SerializeField] private List<HingeJoint> joints = new List<HingeJoint>();
@@ -96,35 +131,6 @@ namespace Game.Scripts.GamePlay
         private float last_motor_update_time = 0f;
         private Dictionary<HingeJoint, string> joint_types = new Dictionary<HingeJoint, string>();
         
-        // Новые переменные для расчета фитнеса
-        [Header("Basic Rewards")]
-        [Tooltip("Базовая награда за каждый тик существования")]
-        [SerializeField] private float survival_reward = 0.0001f;
-        [Tooltip("Бонус за движение вперед (умножитель)")]
-        [SerializeField] private float forward_movement_reward = 5.0f;
-        [Tooltip("Минимальная высота головы для получения награды")]
-        [SerializeField] private float min_head_height = 0.7f;
-
-        [Header("Anti-Fall Rewards")]
-        [Tooltip("Максимальный штраф за падение (когда агент лежит на земле)")]
-        [SerializeField] private float max_fall_penalty = -2.0f;
-        [Tooltip("Высота, ниже которой считается что агент упал")]
-        [SerializeField] private float fall_height_threshold = 0.3f;
-
-        [Header("Early Success Rewards")]
-        [Tooltip("Бонус за первые шаги (временно)")]
-        [SerializeField] private float early_steps_bonus = 0.2f;
-        [Tooltip("Число поколений, в течение которых действует бонус за первые шаги")]
-        [SerializeField] private int early_bonus_generations = 10;
-        [Tooltip("Минимальное расстояние для получения бонуса за первые шаги")]
-        [SerializeField] private float min_distance_for_early_bonus = 0.5f;
-
-        [Header("Balance Rewards")]
-        [Tooltip("Награда за равновесие (умножитель)")]
-        [SerializeField] private float balance_reward = 0.3f;
-        [Tooltip("Штраф за отклонение от вертикали (умножитель)")]
-        [SerializeField] private float tilt_penalty = 0.2f;
-
         // Сохраненные позиции для измерения прогресса
         private float total_distance_moved = 0f;
         private float best_distance = 0f;
@@ -184,24 +190,8 @@ namespace Game.Scripts.GamePlay
                 // Включаем использование мотора
                 joint.useMotor = true;
                 
-                // Устанавливаем лимиты, если их ещё нет
-                JointLimits limits = joint.limits;
-                if (limits.min == 0 && limits.max == 0)
-                {
-                    limits.min = -45 * angle_limit_multiplier;
-                    limits.max = 45 * angle_limit_multiplier;
-                    joint.limits = limits;
-                }
-                else
-                {
-                    // Для существующих лимитов применяем множитель
-                    limits.min *= angle_limit_multiplier;
-                    limits.max *= angle_limit_multiplier;
-                    joint.limits = limits;
-                }
-                
-                // Включаем использование лимитов
-                joint.useLimits = true;
+                // Удаляем автоматическую установку лимитов, чтобы настраивать вручную в префабе
+                // НЕ устанавливаем joint.useLimits - это будет настраиваться в префабе
             }
             
             // Автоматически определяем структуру нейросети
@@ -237,8 +227,8 @@ namespace Game.Scripts.GamePlay
             // Создаем структуру сети с четырьмя слоями: входной, два скрытых, выходной
             network_structure = new int[4];
             network_structure[0] = input_size;
-            network_structure[1] = layer1Size;
-            network_structure[2] = layer2Size;
+            network_structure[1] = 256;
+            network_structure[2] = 128;
             network_structure[3] = output_size;
             
             // Выводим подробности о структуре входного слоя
@@ -290,6 +280,7 @@ namespace Game.Scripts.GamePlay
 
         void Start()
         {
+            Application.runInBackground = true;
             // CRITICAL: Принудительно сбросить все моторы при старте
             ResetAllMotors();
             
@@ -430,12 +421,7 @@ namespace Game.Scripts.GamePlay
                             joint.motor = motor;
                             joint.useMotor = true;
                             
-                            // Применяем множитель к лимитам суставов
-                            JointLimits limits = joint.limits;
-                            limits.min *= angle_limit_multiplier;
-                            limits.max *= angle_limit_multiplier;
-                            joint.limits = limits;
-                            joint.useLimits = true;
+                            // Удаляем установку лимитов, чтобы настраивать вручную в префабе
                         }
                     }
 
@@ -527,18 +513,18 @@ namespace Game.Scripts.GamePlay
             float head_height = head != null ? head.position.y - transform.position.y : 0f;
             
             // Расчет награды за выживание и высоту головы
-            float fitness = survival_reward * Time.time;
+            float fitness = NEW_REWARD_survival_per_second * Time.time;
             
             // 1. Награда за высоту головы (базовое стояние)
-            if (head_height > min_head_height)
+            if (head_height > NEW_REWARD_min_head_height)
             {
-                fitness += head_height * head_height_reward;
+                fitness += head_height * NEW_REWARD_head_height_multiplier;
                 consecutive_upright_time += Time.deltaTime;
                 
                 // Дополнительная награда за продолжительное удержание равновесия
                 if (consecutive_upright_time > 3.0f)
                 {
-                    fitness += balance_reward * consecutive_upright_time * 0.1f;
+                    fitness += NEW_REWARD_balance * consecutive_upright_time * 0.1f;
                 }
             }
             else
@@ -546,12 +532,12 @@ namespace Game.Scripts.GamePlay
                 consecutive_upright_time = 0f;
                 
                 // Штраф за падение, пропорциональный тому, насколько низко опустилась голова
-                float fall_ratio = Mathf.Clamp01((min_head_height - head_height) / min_head_height);
-                float current_fall_penalty = Mathf.Lerp(fall_penalty, max_fall_penalty, fall_ratio);
+                float fall_ratio = Mathf.Clamp01((NEW_REWARD_min_head_height - head_height) / NEW_REWARD_min_head_height);
+                float current_fall_penalty = Mathf.Lerp(NEW_REWARD_fall_penalty, NEW_REWARD_max_fall_penalty, fall_ratio);
                 
                 fitness += current_fall_penalty;
                 
-                if (!has_fallen && head_height < fall_height_threshold)
+                if (!has_fallen && head_height < NEW_REWARD_min_head_height)
                 {
                     has_fallen = true;
                     Debug.Log($"👎 Агент {name} упал! Высота головы: {head_height:F2}");
@@ -568,7 +554,7 @@ namespace Game.Scripts.GamePlay
             if (forward_distance > 0)
             {
                 // Награда за движение вперед
-                fitness += forward_distance * forward_movement_reward;
+                fitness += forward_distance * NEW_REWARD_movement_multiplier;
                 
                 // Общее пройденное расстояние
                 total_distance_moved += forward_distance;
@@ -581,10 +567,10 @@ namespace Game.Scripts.GamePlay
                 
                 // Бонус за первые шаги в ранних поколениях
                 if (simulation_manager != null && 
-                    simulation_manager.GetCurrentGeneration() < early_bonus_generations && 
-                    total_distance_moved > min_distance_for_early_bonus)
+                    simulation_manager.GetCurrentGeneration() < NEW_REWARD_early_bonus_generations && 
+                    total_distance_moved > NEW_REWARD_min_distance_for_early_bonus)
                 {
-                    fitness += early_steps_bonus;
+                    fitness += NEW_REWARD_early_steps_bonus;
                 }
             }
             
@@ -592,7 +578,7 @@ namespace Game.Scripts.GamePlay
             float upright_dot = Vector3.Dot(transform.up, Vector3.up);
             float tilt_factor = 1f - upright_dot; // 0 = вертикально, 1 = лежит
             
-            fitness -= tilt_factor * tilt_penalty;
+            fitness -= tilt_factor * NEW_REWARD_tilt_penalty;
             
             // 4. Бонус за оставление следов (означает что агент идет)
             // Если это важно, добавь здесь логику
@@ -1077,7 +1063,7 @@ namespace Game.Scripts.GamePlay
                             // Меняем скорость мотора на основе выхода нейросети
                             JointMotor motor = joints[i].motor;
                             
-                            // КРИТИЧЕСКИЙ БАГИ: Force равен 1, а должен быть равен max_motor_force
+                            // КРИТИЧЕСКИЙ БАГ: Force равен 1, а должен быть равен max_motor_force
                             // Принудительно устанавливаем правильное значение силы
                             if (motor.force < max_motor_force * 0.9f)
                             {
@@ -1096,8 +1082,51 @@ namespace Game.Scripts.GamePlay
                                 }
                             }
                             
-                            // Устанавливаем выходные данные нейросети в targetVelocity
-                            motor.targetVelocity = action * max_velocity;
+                            // НОВЫЙ КОД: Сглаживание скорости между кадрами
+                            float targetVelocity = action * max_velocity;
+                            float currentVelocity = motor.targetVelocity;
+                            
+                            // КРИТИЧЕСКИ ВАЖНО: Добавляем обратную связь от угла сустава
+                            if (use_joint_feedback)
+                            {
+                                // Получаем текущий угол сустава и нормализуем его в диапазон [-1, 1]
+                                JointLimits limits = joints[i].limits;
+                                float jointRange = limits.max - limits.min;
+                                float normalizedAngle = 0;
+                                
+                                if (jointRange > 0)
+                                {
+                                    // Где 0 = середина диапазона, -1 = минимум, 1 = максимум
+                                    normalizedAngle = (2f * (joints[i].angle - limits.min) / jointRange) - 1f;
+                                    
+                                    // Если сустав близок к пределу, корректируем targetVelocity
+                                    // чтобы предотвратить упор в предел
+                                    if (normalizedAngle > 0.8f && targetVelocity > 0)
+                                    {
+                                        // Корректируем скорость в зависимости от близости к пределу
+                                        targetVelocity *= (1f - (normalizedAngle - 0.8f) * 5f * joint_angle_feedback);
+                                    }
+                                    else if (normalizedAngle < -0.8f && targetVelocity < 0)
+                                    {
+                                        // То же самое для другого предела
+                                        targetVelocity *= (1f - (-normalizedAngle - 0.8f) * 5f * joint_angle_feedback);
+                                    }
+                                }
+                            }
+                            
+                            // Теперь увеличиваем скорость сглаживания для более быстрой реакции
+                            float clampedTargetVelocity = Mathf.Clamp(
+                                targetVelocity, 
+                                currentVelocity - max_velocity_delta, 
+                                currentVelocity + max_velocity_delta
+                            );
+                            
+                            // Увеличиваем коэффициент для более быстрой реакции
+                            float smoothedVelocity = Mathf.Lerp(currentVelocity, clampedTargetVelocity, 
+                                                                Mathf.Max(velocity_smoothing, 0.5f));
+                            
+                            // Применяем финальное значение
+                            motor.targetVelocity = smoothedVelocity;
                             
                             // Дополнительное логирование для очень малых значений, которые могут быть причиной проблемы
                             if (isTopAgent && Math.Abs(action) < 0.001f && Time.frameCount % 200 == i)
@@ -1185,7 +1214,7 @@ namespace Game.Scripts.GamePlay
             // Проверяем высоту головы
             float currentHeadHeight = head.position.y;
             
-            if (currentHeadHeight < required_head_height)
+            if (currentHeadHeight < NEW_REWARD_min_head_height)
             {
                 // Сбрасываем счётчик стояния
                 standing_time = 0f;
@@ -1197,12 +1226,12 @@ namespace Game.Scripts.GamePlay
                 standing_time += Time.fixedDeltaTime;
                 
                 // Даем бонус за хорошую высоту головы с усилением за длительное стояние
-                float heightBonus = head_height_reward;
+                float heightBonus = NEW_REWARD_head_height_multiplier;
                 
                 // Увеличиваем бонус при длительном стоянии
-                if (standing_time > min_standing_time)
+                if (standing_time > NEW_REWARD_min_standing_time)
                 {
-                    heightBonus *= Mathf.Min(2.0f, 1.0f + (standing_time - min_standing_time) * 0.1f);
+                    heightBonus *= Mathf.Min(2.0f, 1.0f + (standing_time - NEW_REWARD_min_standing_time) * 0.1f);
                 }
                 
                 fitness += heightBonus * Time.fixedDeltaTime;
@@ -1250,7 +1279,7 @@ namespace Game.Scripts.GamePlay
                 success_reported = true;
                 
                 // Добавляем большую награду за достижение цели
-                fitness += target_reward;
+                fitness += NEW_REWARD_target_reached;
                 if (neural_network != null)
                 {
                     neural_network.fitness = fitness;
@@ -1273,10 +1302,10 @@ namespace Game.Scripts.GamePlay
             if (head == null) return;
             
             // Если голова слишком низко - агент упал
-            if (head.position.y < 0.3f)
+            if (head.position.y < NEW_REWARD_min_head_height)
             {
                 // Применяем штраф, но не слишком большой, чтобы был стимул продолжать двигаться
-                fitness -= fall_penalty * 0.7f;
+                fitness -= NEW_REWARD_fall_penalty * 0.7f;
                 
                 // Даже если упал, не обнуляем прогресс полностью
                 if (neural_network != null)
@@ -1287,7 +1316,7 @@ namespace Game.Scripts.GamePlay
                 // Важное событие - падение, но логируем только для небольшого числа агентов
                 if (instance_id % 20 == 0)
                 {
-                    Debug.Log($"👇 Агент {instance_id} упал! Штраф: -{fall_penalty * 0.7f:F2}, Общий фитнес: {fitness:F2}");
+                    Debug.Log($"👇 Агент {instance_id} упал! Штраф: -{NEW_REWARD_fall_penalty * 0.7f:F2}, Общий фитнес: {fitness:F2}");
                 }
                 
                 // Отключаем агента только если он лежит совсем неподвижно
@@ -1582,18 +1611,31 @@ namespace Game.Scripts.GamePlay
             // Рассчитываем смещение с момента последнего вызова
             float distanceMoved = Vector3.Distance(transform.position, last_position);
             
-            // Если есть движение
+            // Если есть любое движение вообще - даем небольшую награду за активность
+            if (distanceMoved > 0.0005f) 
+            {
+                // Базовая награда за любую активность для начала обучения
+                fitness += 0.01f;
+            }
+            
+            // Если есть значимое движение
             if (distanceMoved > 0.001f)
             {
-                // Рассчитываем только движение вперед
+                // Рассчитываем движение вперед
                 Vector3 localDirection = transform.InverseTransformDirection(transform.position - last_position);
                 float forwardMovement = localDirection.z;
                 
-                // Даем награду только за движение вперед
+                // Основная награда за движение вперед
                 if (forwardMovement > 0)
                 {
-                    // Награда за движение, пропорциональная расстоянию
-                    float reward = forwardMovement * movement_reward;
+                    // ЗНАЧИТЕЛЬНО увеличиваем награду за движение, пропорциональную расстоянию
+                    float reward = forwardMovement * NEW_REWARD_movement_multiplier * 3.0f;
+                    
+                    // Бонус за более серьезные движения (не микротелодвижения) 
+                    if (forwardMovement > 0.01f)
+                    {
+                        reward *= 1.5f;
+                    }
                     
                     // Если цель указана, добавляем бонус за движение в направлении цели
                     if (target_transform != null)
@@ -1614,7 +1656,7 @@ namespace Game.Scripts.GamePlay
                             // Если движение в сторону цели (угол < 90°)
                             if (dotProduct > 0)
                             {
-                                reward *= (1f + dotProduct * target_direction_multiplier);
+                                reward *= (1f + dotProduct * NEW_REWARD_target_direction_multiplier);
                             }
                         }
                     }
@@ -1629,11 +1671,16 @@ namespace Game.Scripts.GamePlay
                     // Обновляем время последнего движения
                     last_moved_time = Time.time;
                 }
+                else if (localDirection.magnitude > 0.005f) {
+                    // Даем маленькую награду даже за движение назад или в сторону
+                    // Это поможет начать делать хоть какие-то движения
+                    fitness += 0.05f;
+                }
             }
-            else if (Time.time - last_moved_time > 2.0f)
+            else if (Time.time - last_moved_time > 1.0f) // Уменьшаем время до начала штрафа
             {
-                // Штраф за отсутствие движения более 2 секунд
-                fitness -= no_movement_penalty * Time.deltaTime;
+                // Значительно уменьшаем штраф, чтобы не перевешивать награды
+                fitness -= NEW_REWARD_no_movement_penalty * 0.2f * Time.deltaTime;
                 
                 // Убедимся, что фитнес не станет отрицательным из-за штрафа за бездействие
                 if (fitness < 0)

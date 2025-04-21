@@ -82,6 +82,9 @@ namespace Game.Scripts.GamePlay
                 InitializeWeightsAndBiases();
             }
 
+            // Добавим немного случайности в инициализацию для разнообразия нейросетей
+            bool useWideInitialization = UnityEngine.Random.value < 0.3f; // 30% на расширенную инициализацию
+            
             // Задаем случайные значения весам с улучшенной инициализацией
             for (int i = 0; i < weights.Length; i++)
             {
@@ -91,7 +94,13 @@ namespace Game.Scripts.GamePlay
                     {
                         // Используем He инициализацию для ReLU активации - лучше для глубоких сетей
                         float he = Mathf.Sqrt(2f / layers[i]);
-                        weights[i][j][k] = UnityEngine.Random.Range(-he, he);
+                        
+                        // В 30% случаев используем более широкую инициализацию для выхода из локальных минимумов
+                        if (useWideInitialization) {
+                            weights[i][j][k] = UnityEngine.Random.Range(-he * 2.0f, he * 2.0f);
+                        } else {
+                            weights[i][j][k] = UnityEngine.Random.Range(-he, he);
+                        }
                     }
                 }
             }
@@ -101,7 +110,12 @@ namespace Game.Scripts.GamePlay
             {
                 for (int j = 0; j < biases[i].Length; j++)
                 {
-                    biases[i][j] = UnityEngine.Random.Range(-0.1f, 0.1f);
+                    // В 30% случаев используем более широкую инициализацию для смещений
+                    if (useWideInitialization) {
+                        biases[i][j] = UnityEngine.Random.Range(-1.0f, 1.0f);
+                    } else {
+                        biases[i][j] = UnityEngine.Random.Range(-0.5f, 0.5f); // Увеличен диапазон для лучшего старта
+                    }
                 }
             }
         }
@@ -176,9 +190,10 @@ namespace Game.Scripts.GamePlay
                     }
 
                     // Применяем функцию активации и сохраняем результат
-                    if (i == layers.Length - 2) // Выходной слой - используем tanh для физического контроля
+                    if (i == layers.Length - 2) // Выходной слой - используем модифицированную линейную функцию
                     {
-                        nextLayer[j] = (float)Math.Tanh(sum); // Tanh дает диапазон [-1,1], лучше для управления суставами
+                        // Линейная функция с жестким ограничением для лучшего контроля
+                        nextLayer[j] = Mathf.Clamp(sum, -1f, 1f);
                     }
                     else // Скрытые слои
                     {
