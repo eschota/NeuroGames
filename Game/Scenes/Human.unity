@@ -329,7 +329,7 @@ Transform:
   m_GameObject: {fileID: 76078540}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 16.14, y: 0, z: 3.66}
+  m_LocalPosition: {x: 58.6, y: 0, z: 3.66}
   m_LocalScale: {x: 1, y: 5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -504,6 +504,37 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+--- !u!1 &360766697
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 360766698}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &360766698
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 360766697}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -9.703011, y: -0.74, z: 7.8412294}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -1055,7 +1086,7 @@ Transform:
   m_GameObject: {fileID: 615085767}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -15.78, y: 0, z: 24.8}
+  m_LocalPosition: {x: -15.78, y: 0, z: 50.7}
   m_LocalScale: {x: 147.09389, y: 15.8715, z: 3.1743}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1286,7 +1317,7 @@ Transform:
   m_GameObject: {fileID: 854445044}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 22.66, y: 0, z: 10.66}
+  m_LocalPosition: {x: 65.119995, y: 0, z: 10.66}
   m_LocalScale: {x: 3.1743, y: 15.8715, z: 3.1743}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1394,7 +1425,7 @@ Transform:
   m_GameObject: {fileID: 859739683}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -4.32, y: 0.45, z: 0}
+  m_LocalPosition: {x: -12.3, y: -0.5, z: -9.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1815,7 +1846,7 @@ Transform:
   m_GameObject: {fileID: 1583696872}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 13.2, y: 0, z: 23.6}
+  m_LocalPosition: {x: 55.66, y: 0, z: 23.6}
   m_LocalScale: {x: 3.1743, y: 15.8715, z: 3.1743}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1923,7 +1954,7 @@ Transform:
   m_GameObject: {fileID: 1707766566}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 27.7, y: 0, z: -5.67}
+  m_LocalPosition: {x: 70.16, y: 0, z: -5.67}
   m_LocalScale: {x: 3.1743, y: 15.8715, z: 3.1743}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2046,6 +2077,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1762820706}
+  - component: {fileID: 1762820708}
   - component: {fileID: 1762820707}
   m_Layer: 0
   m_Name: GamePlay
@@ -2078,50 +2110,48 @@ MonoBehaviour:
   m_GameObject: {fileID: 1762820704}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d14ed8cb989624a4a8a1a1bac670b794, type: 3}
+  m_Script: {fileID: 11500000, guid: 15deb4ef120ee944bbc28b882a0aa021, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  generation_time: 10
-  population_size: 50
-  mutation_rate: 0.1
-  mutation_strength: 0.5
-  elite_selection: 1
-  elite_count: 5
-  max_lifetime: 30
-  initial_tournament_size: 3
-  tournament_increase_generation: 10
-  max_tournament_size: 7
-  radical_mutation_chance: 0.02
-  adaptive_mutation: 1
-  stagnation_threshold: 5
-  agent_prefab_path: Agents/Human
-  spawn_point: {fileID: 859739687}
-  spawn_radius: 12
-  useRandomRotation: 1
-  agent_spacing: 1.5
-  agents_per_row: 8
-  highlight_top_agents: 1
-  agent_material_property: _Color
-  max_agent_force: 1e+14
-  time_speed_presets:
-  - 1
-  - 2
-  - 3
-  - 4
-  - 5
-  time_scale: 1
-  default_motor_force: 1e+11
-  draw_gizmos: 1
-  neural_layers: 66000000660000003c0000000f000000
-  best_model_filename: best_model.json
-  models_directory: Models
-  show_detailed_logs: 1
-  stats_log_prefix: "\U0001F9E0\U0001F463"
-  save_logs_to_file: 1
-  best_agent_log_filename: best_agent_log.txt
-  minimum_generation_time: 3
-  enable_early_termination: 1
-  max_fallen_percentage: 0.95
+  simulationManager: {fileID: 1762820708}
+  showUI: 1
+  groundCheckDistance: 0.1
+  bodyFallPenalty: 50
+  headLowPenalty: 30
+  showFitnessGraph: 1
+  maxGenerationsToShow: 50
+  graphLineColor: {r: 0, g: 1, b: 0.5, a: 1}
+  graphBackgroundColor: {r: 0, g: 0, b: 0, a: 0.7}
+  graphSize: {x: 400, y: 200}
+  graphPosition: {x: 20, y: 250}
+--- !u!114 &1762820708
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1762820704}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24947c5aaf1775744ad13bde910309d5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  agentsCount: 100
+  simulationTimer: 25
+  simulationsCountPerPrefab: 1000
+  startTransform: {fileID: 859739687}
+  mutationRate: 0.1
+  mutationStrength: 0.5
+  elitePercentage: 0.1
+  neuralNetworkLayers: 0a000000140000000a000000
+  defaultMaterial: {fileID: 0}
+  eliteColor: {r: 1, g: 0.8, b: 0, a: 1}
+  bestColor: {r: 0.8, g: 0, b: 1, a: 1}
+  worstColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  emissionIntensity: 2
+  useEmission: 1
+  showDebugLogs: 1
+  validateNetworks: 1
 --- !u!1 &1846137161
 GameObject:
   m_ObjectHideFlags: 0
@@ -2221,18 +2251,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f899139e0b2e9ed419d9ee997351fc00, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ray_length: 25
-  color_transition_time: 0.1
-  aim_layer:
-    serializedVersion: 2
-    m_Bits: 0
-  no_hit_color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  far_hit_color: {r: 0, g: 1, b: 0, a: 1}
-  close_hit_color: {r: 1, g: 0, b: 0, a: 1}
-  aim_hit_color: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  OUTPUT:
-  - 0
-  - 0
 --- !u!1 &2131263171
 GameObject:
   m_ObjectHideFlags: 0
@@ -2353,3 +2371,4 @@ SceneRoots:
   - {fileID: 181991434}
   - {fileID: 1762820706}
   - {fileID: 859739687}
+  - {fileID: 360766698}
